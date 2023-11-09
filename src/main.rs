@@ -3,8 +3,9 @@ use axum::{
     Router,
     response::Json,
     response::IntoResponse,
-    http::StatusCode
+    http::{StatusCode, HeaderMap}
 };
+use reqwest::header;
 use serde_json::json;
 
 use std::net::SocketAddr;
@@ -14,10 +15,14 @@ use locspan::{Location, Span};
 use iref::IriBuf;
 use contextual::WithContext;
 
+const DOMAIN: &str = "http://localhost:3001/";
+
 #[tokio::main]
 async fn main() {
     let app = Router::new()
         .route("/", get(root))
+        .route("/.well-known/host-meta/", get(host_meta))
+        .route("/.well-known/webfinger", get(webfinger))
         .route("/_kokt", get(kokt))
         .route("/_ste", get(ste));
         let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
@@ -28,6 +33,21 @@ async fn main() {
         .unwrap();
 }
 
+async fn host_meta() -> impl IntoResponse {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "application/xrd+xml".parse().unwrap());
+    (
+        headers,
+        format!("<?xml version=\"1.0\"?><XRD xmlns=\"http://docs.oasis-open.org/ns/xri/xrd-1.0\"><Link rel=\"lrdd\" type=\"application/xrd+xml\" template=\"{}/.well-known/webfinger?resource={{uri}}\" /></XRD>", DOMAIN)
+    )
+}
+
+async fn webfinger() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(json!("OK"))
+    )
+}
 
 async fn kokt() -> impl IntoResponse {
     //reqwest with header
