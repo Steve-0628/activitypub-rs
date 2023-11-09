@@ -1,0 +1,18 @@
+#![feature(error_iter)]
+[package]
+name = "activitypub"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.6.20"
+contextual = "0.1.6"
+iref = "2.2.3"
+json-ld = { version = "0.15.0", features = ["reqwest"] }
+locspan = "0.7.16"
+rdf-types = "0.15.4"
+reqwest = "0.11.22"
+serde_json = "1.0.68"
+tokio = { version = "1.0", features = ["full"] }
