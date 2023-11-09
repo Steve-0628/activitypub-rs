@@ -1,4 +1,5 @@
 use axum::{
+    extract::Query,
     routing::get,
     Router,
     response::Json,
@@ -6,23 +7,25 @@ use axum::{
     http::{StatusCode, HeaderMap}
 };
 use reqwest::header;
+use serde::Deserialize;
 use serde_json::json;
 
-use std::net::SocketAddr;
-use json_ld::{self, RemoteDocumentReference, JsonLdProcessor, Print, RemoteDocument, syntax::Parse,};
-use rdf_types::{self, vocabulary::IriIndex, IriVocabularyMut};
-use locspan::{Location, Span};
-use iref::IriBuf;
-use contextual::WithContext;
+use regex::Regex;
+use url::Url;
 
-const DOMAIN: &str = "http://localhost:3001/";
+use std::net::SocketAddr;
+use ld::string_to_jsonld_json;
+
+mod ld;
+
+const DOMAIN: &str = "http://localhost:3001";
 
 #[tokio::main]
 async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/.well-known/host-meta/", get(host_meta))
-        .route("/.well-known/webfinger", get(webfinger))
+        .route("/.well-known/webfinger/", get(webfinger))
         .route("/_kokt", get(kokt))
         .route("/_ste", get(ste));
         let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
@@ -42,10 +45,58 @@ async fn host_meta() -> impl IntoResponse {
     )
 }
 
-async fn webfinger() -> impl IntoResponse {
+#[derive(Deserialize, Debug)]
+struct WebfingerQuery {
+    resource: Option<String>,
+}
+
+async fn webfinger(resource: Query<WebfingerQuery>) -> impl IntoResponse {
+    println!("{:#?}", resource);
+    match &resource.resource {
+        Some(r) => {
+            //regex to match acct:username@domain and @username@domain and extract
+            let re = Regex::new(r"(acct:|@)(?<username>[\w]+)@(?<domain>[\w\-\.]+\.?[\w-]+)").unwrap();
+            match re.captures(&r) {
+                Some(cap) => {
+                    println!("username: {}", &cap["username"]);
+                    println!("domain: {}", &cap["domain"]);
+
+                    if Url::parse(DOMAIN).unwrap().host().unwrap().to_string() != &cap["domain"] {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(json!({"error": "Error: not me"}))
+                        )
+                    }
+                    let resp = json!({
+                        "subject": r,
+                        "aliases": [
+                            format!("{}/users/{}", DOMAIN, &cap["username"])
+                        ],
+                        "links": [
+                            {
+                                "rel": "self",
+                                "type": "application/activity+json",
+                                "href": format!("{}/users/{}", DOMAIN, &cap["username"])
+                            }
+                        ]
+                    });
+                    return (
+                        StatusCode::OK,
+                        Json(resp)
+                    );
+                },
+                None => {
+                    println!("no match");
+                },
+            }
+        }
+        None => {
+        }
+    }
+    
     (
-        StatusCode::OK,
-        Json(json!("OK"))
+        StatusCode::BAD_REQUEST,
+        Json(json!({"error": "Error"}))
     )
 }
 
@@ -59,7 +110,6 @@ async fn kokt() -> impl IntoResponse {
 
     let mut body = response.unwrap().text().await.unwrap();
     let body2 = body.clone();
-    // println!("{:#?}", serde_json::from_str::<serde_json::Value>(&body2));
 
     let body_str = serde_json::to_string(&serde_json::from_str::<serde_json::Value>(&body2).unwrap()).unwrap();
     println!("{:#?}", body_str);
@@ -72,81 +122,12 @@ async fn kokt() -> impl IntoResponse {
 }
 
 async fn ste() -> impl IntoResponse {
-    // let a = string_to_jsonld_json(&mut "https://honi.stesan.dev/users/93h73zkvw3".to_string()).await;
     (
         StatusCode::OK,
         // Json(a)
         Json("OK")
     )
 }
-
-#[derive(Clone)]
-#[derive(Debug)]
-enum Source {
-    Nowhere,
-	Iri(IriIndex),
-}
-
-async fn string_to_jsonld_json(url: &mut String, body: &mut String) -> serde_json::Value {
-    let mut vocabulary: rdf_types::IndexVocabulary = rdf_types::IndexVocabulary::new();
-    let mut loader: json_ld::ReqwestLoader<IriIndex, locspan::Location<Source, Span>>
-        = json_ld::loader::ReqwestLoader::
-            new_with_metadata_map(|_, url, span| {
-                Location::new(Source::Iri(*url), span)
-            });
-    // let mut loader = json_ld::NoLoader::<IriIndex, Span>::new();
-    println!("{:?}", url);
-    let url = vocabulary.insert(IriBuf::new(url).unwrap().as_iri());
-    // let remote_doc: RemoteDocumentReference<IriIndex, Location<Source>> = RemoteDocumentReference::iri(url);
-    let remote_doc = RemoteDocumentReference::Loaded(
-        RemoteDocument::new(
-            Some(url), 
-            Some("application/activity+json".parse().unwrap()),
-            json_ld::syntax::Value::parse_str(&body, |span| {Location::new(Source::Nowhere, span)}).unwrap(),
-        )
-    );
-    let options: json_ld::Options<IriIndex, locspan::Location<Source>> = json_ld::Options {
-        // expansion_policy: json_ld::expansion::Policy::Strictest,
-        ..Default::default()
-    };
-    let result = remote_doc.expand_with_using(&mut vocabulary, &mut loader, options).await;
-    println!("aaaaa");
-    match result {
-        Ok(mut expanded) => {
-            expanded.canonicalize();
-            return serde_json::from_str(&expanded.with(&vocabulary).inline_print().to_string()).unwrap()
-        }
-        Err(e) => {
-            println!("Error: {:?}", e);
-            return json!(format!("{:?}", e))
-        }
-    }
-
-    // let remote_local_doc = RemoteDocument::new(
-    //     Some(iri!("https://simkey.net/users/8rg6sbkjuv/").to_owned()),
-    //     Some("application/activity+json".parse().unwrap()),
-    //     json_ld::syntax::Value::parse_str(r#""#, |span| span).unwrap()
-    // );
-    // let mut local_loader = json_ld::NoLoader::<IriBuf, Span>::new();
-    // let expanded = remote_local_doc.expand(&mut local_loader).await;
-    // match expanded {
-    //     Ok(mut expanded) => {
-    //         expanded.canonicalize();
-    //         // expanded
-    //         // return serde_json::from_str(&expanded.with(&vocabulary).inline_print().to_string()).unwrap()
-    //         // serde_json::from_value(expanded);
-    //         println!("{:?}", expanded);
-    //         expanded.objects();
-
-    //         return serde_json::from_str("{}").unwrap()
-    //     }
-    //     Err(e) => {
-    //         println!("Error: {:?}", e);
-    //         return json!(e.to_string())
-    //     }
-    // }
-}
-
 
 async fn root() -> impl IntoResponse {
     (

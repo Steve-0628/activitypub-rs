@@ -7,13 +7,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.6.20"
+axum = { version = "0.6.20", features = ["query"] }
 contextual = "0.1.6"
 iref = "2.2.3"
 json-ld = { version = "0.15.0", features = ["reqwest"] }
 locspan = "0.7.16"
 rdf-types = "0.15.4"
+regex = "1.10.2"
 reqwest = "0.11.22"
+serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.68"
 static-iref = "2.0.0"
 tokio = { version = "1.0", features = ["full"] }
+url = "2.4.1"
