@@ -16,8 +16,6 @@ use locspan::{Location, Span};
 use iref::IriBuf;
 use contextual::WithContext;
 
-mod ld;
-
 #[tokio::main]
 async fn main() {
     let app = Router::new()
