@@ -1,8 +1,4 @@
-use serde::{Deserialize, Serialize};
-use surrealdb::engine::remote::ws::Ws;
-use surrealdb::opt::auth::Root;
-use surrealdb::sql::Thing;
-use surrealdb::Surreal;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct User<'a> {

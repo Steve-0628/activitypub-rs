@@ -1,58 +1,55 @@
 use axum::{
-    extract::Query,
     routing::get,
     Router,
     response::Json,
     response::IntoResponse,
-    http::{StatusCode, HeaderMap},
+    http::StatusCode,
     Extension,
 };
-use reqwest::header;
-use serde::Deserialize;
 use serde_json::json;
-
-use regex::Regex;
 use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal};
-use url::Url;
 
 use std::{net::SocketAddr, sync::Arc};
 use ld::string_to_jsonld_json;
 
 mod ld;
 mod db;
+mod routes;
 
 const DOMAIN: &str = "http://localhost:3001";
 
 #[derive(Clone)]
 #[derive(Debug)]
-struct Db {
+struct Config {
     db: Surreal<Client>,
+    domain: String,
 }
 
-impl Db {
+impl Config {
     async fn new() -> Self {
         let db = Surreal::new::<Ws>("127.0.0.1:8000").await.unwrap();
         db.use_db("activitypub").await.unwrap();
-        Db {
+        Config {
             db,
+            domain: DOMAIN.to_string(),
         }
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let db = Arc::new(
-        Db::new().await
+    let config = Arc::new(
+        Config::new().await
     );
 
     let app = Router::new()
         .route("/", get(root))
-        .route("/.well-known/host-meta/", get(host_meta))
-        .route("/.well-known/webfinger/", get(webfinger))
+        .merge(routes::routes::routes())
+
         .route("/_kokt", get(kokt))
         .route("/_ste", get(ste))
         // layer は最後
-        .layer(Extension(db));
+        .layer(Extension(config));
         let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
 
     axum::Server::bind(&addr)
@@ -61,73 +58,6 @@ async fn main() {
         .unwrap();
 }
 
-async fn host_meta() -> impl IntoResponse {
-    let mut headers = HeaderMap::new();
-    headers.insert(header::CONTENT_TYPE, "application/xrd+xml".parse().unwrap());
-    (
-        headers,
-        format!("<?xml version=\"1.0\"?><XRD xmlns=\"http://docs.oasis-open.org/ns/xri/xrd-1.0\"><Link rel=\"lrdd\" type=\"application/xrd+xml\" template=\"{}/.well-known/webfinger?resource={{uri}}\" /></XRD>", DOMAIN)
-    )
-}
-
-#[derive(Deserialize, Debug)]
-struct WebfingerQuery {
-    resource: Option<String>,
-}
-
-    
-pub(crate) async fn webfinger(db: Extension<Arc<Db>>, resource: Query<WebfingerQuery>) -> impl IntoResponse {
-    // let user: Vec<db::User> = self.db.select("user").await.unwrap();
-    // println!("{:#?}", self.db.select::<db::User>("user"));
-
-    println!("{:#?}", db);
-    match &resource.resource {
-        Some(r) => {
-            //regex to match acct:username@domain and @username@domain and extract
-            let re = Regex::new(r"(acct:|@)(?<username>[\w]+)@(?<domain>[\w\-\.]+\.?[\w-]+)").unwrap();
-            match re.captures(&r) {
-                Some(cap) => {
-                    println!("username: {}", &cap["username"]);
-                    println!("domain: {}", &cap["domain"]);
-
-                    if Url::parse(DOMAIN).unwrap().host().unwrap().to_string() != &cap["domain"] {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            Json(json!({"error": "Error: not me"}))
-                        )
-                    }
-                    let resp = json!({
-                        "subject": r,
-                        "aliases": [
-                            format!("{}/users/{}", DOMAIN, &cap["username"])
-                        ],
-                        "links": [
-                            {
-                                "rel": "self",
-                                "type": "application/activity+json",
-                                "href": format!("{}/users/{}", DOMAIN, &cap["username"])
-                            }
-                        ]
-                    });
-                    return (
-                        StatusCode::OK,
-                        Json(resp)
-                    );
-                },
-                None => {
-                    println!("no match");
-                },
-            }
-        }
-        None => {
-        }
-    }
-    
-    (
-        StatusCode::BAD_REQUEST,
-        Json(json!({"error": "Error"}))
-    )
-}
 
 async fn kokt() -> impl IntoResponse {
     //reqwest with header
