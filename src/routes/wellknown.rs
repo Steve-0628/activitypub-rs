@@ -12,11 +12,12 @@ use serde::Deserialize;
 use serde_json::json;
 
 use regex::Regex;
+use surrealdb::{Surreal, engine::remote::ws::Ws, opt::auth::Root};
 use url::Url;
 
-use std::sync::Arc;
+use std::{sync::Arc, f32::consts::E};
 
-use crate::Config;
+use crate::{Config, db::User};
 
 pub(crate) fn routes() -> Router {
     Router::new()
@@ -46,30 +47,50 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
                             Json(json!({"error": "Error: not me"}))
                         )
                     }
-                    let resp = json!({
-                        "subject": r,
-                        "aliases": [
-                            format!("{}/users/{}", &config.domain, &cap["username"])
-                        ],
-                        "links": [
-                            {
-                                "rel": "self",
-                                "type": "application/activity+json",
-                                "href": format!("{}/users/{}", &config.domain, &cap["username"])
-                            }
-                        ]
-                    });
-                    return (
-                        StatusCode::OK,
-                        Json(resp)
-                    );
+
+                    // let query = surrealdb::
+                        // .where_("username", &cap["username"])
+                        // .build();
+                    // let users: Result<Option<crate::db::User>, _> = config.db.select(("users", "userid:userid1")).await;
+                    let mut users = config.db.query("select * from users where userid = $userid")
+                        .bind(("userid", &cap["username"])).await.unwrap();
+
+                    let user: Option<crate::db::User> = users.take(0).unwrap();
+
+                    match user {
+                        Some(user) => {
+                            println!("user: {:?}", user);
+                            
+                            let resp = json!({
+                                "subject": r,
+                                "aliases": [
+                                    format!("{}/users/{}", &config.domain, &cap["username"])
+                                ],
+                                "links": [
+                                    {
+                                        "rel": "self",
+                                        "type": "application/activity+json",
+                                        "href": format!("{}/users/{}", &config.domain, &cap["username"])
+                                    }
+                                ]
+                            });
+                            return (
+                                StatusCode::OK,
+                                Json(resp)
+                            );
+                        },
+                        None => {
+                            println!("no user match");
+                        },
+                    }
                 },
                 None => {
-                    println!("no match");
+                    println!("no regex user match");
                 },
             }
         }
         None => {
+            println!("no query resource");
         }
     }
     

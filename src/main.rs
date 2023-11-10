@@ -7,7 +7,7 @@ use axum::{
     Extension,
 };
 use serde_json::json;
-use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal};
+use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal, opt::auth::Root};
 
 use std::{net::SocketAddr, sync::Arc};
 use ld::string_to_jsonld_json;
@@ -28,7 +28,14 @@ struct Config {
 impl Config {
     async fn new() -> Self {
         let db = Surreal::new::<Ws>("127.0.0.1:8000").await.unwrap();
-        db.use_db("activitypub").await.unwrap();
+        // db.signin(
+        //     Root {
+        //         username: "root",
+        //         password: "root",
+        //     }
+        // ).await.unwrap();
+        db.use_ns("activitypub").use_db("activitypub").await.unwrap();
+        // println!("{:#?}", db.version().await.unwrap());
         Config {
             db,
             domain: DOMAIN.to_string(),

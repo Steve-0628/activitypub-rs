@@ -1,7 +1,7 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize)]
-pub(crate) struct User<'a> {
-    pub(crate) id: &'a str,
-    pub(crate) username: &'a str,
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct User {
+    pub(crate) userid: String,
+    pub(crate) username: String,
 }
