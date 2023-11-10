@@ -20,10 +20,8 @@ pub(crate) async fn string_to_jsonld_json(url: &mut String, body: &mut String) -
             new_with_metadata_map(|_, url, span| {
                 Location::new(Source::Iri(*url), span)
             });
-    // let mut loader = json_ld::NoLoader::<IriIndex, Span>::new();
     println!("{:?}", url);
     let url = vocabulary.insert(IriBuf::new(url).unwrap().as_iri());
-    // let remote_doc: RemoteDocumentReference<IriIndex, Location<Source>> = RemoteDocumentReference::iri(url);
     let remote_doc = RemoteDocumentReference::Loaded(
         RemoteDocument::new(
             Some(url), 
@@ -32,11 +30,9 @@ pub(crate) async fn string_to_jsonld_json(url: &mut String, body: &mut String) -
         )
     );
     let options: json_ld::Options<IriIndex, locspan::Location<Source>> = json_ld::Options {
-        // expansion_policy: json_ld::expansion::Policy::Strictest,
         ..Default::default()
     };
     let result = remote_doc.expand_with_using(&mut vocabulary, &mut loader, options).await;
-    println!("aaaaa");
     match result {
         Ok(mut expanded) => {
             expanded.canonicalize();
@@ -47,28 +43,4 @@ pub(crate) async fn string_to_jsonld_json(url: &mut String, body: &mut String) -
             return json!(format!("{:?}", e))
         }
     }
-
-    // let remote_local_doc = RemoteDocument::new(
-    //     Some(iri!("https://simkey.net/users/8rg6sbkjuv/").to_owned()),
-    //     Some("application/activity+json".parse().unwrap()),
-    //     json_ld::syntax::Value::parse_str(r#""#, |span| span).unwrap()
-    // );
-    // let mut local_loader = json_ld::NoLoader::<IriBuf, Span>::new();
-    // let expanded = remote_local_doc.expand(&mut local_loader).await;
-    // match expanded {
-    //     Ok(mut expanded) => {
-    //         expanded.canonicalize();
-    //         // expanded
-    //         // return serde_json::from_str(&expanded.with(&vocabulary).inline_print().to_string()).unwrap()
-    //         // serde_json::from_value(expanded);
-    //         println!("{:?}", expanded);
-    //         expanded.objects();
-
-    //         return serde_json::from_str("{}").unwrap()
-    //     }
-    //     Err(e) => {
-    //         println!("Error: {:?}", e);
-    //         return json!(e.to_string())
-    //     }
-    // }
 }
