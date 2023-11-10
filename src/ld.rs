@@ -24,9 +24,9 @@ pub(crate) async fn string_to_jsonld_json(url: &mut String, body: &mut String) -
     let url = vocabulary.insert(IriBuf::new(url).unwrap().as_iri());
     let remote_doc = RemoteDocumentReference::Loaded(
         RemoteDocument::new(
-            Some(url), 
+            Some(url),
             Some("application/activity+json".parse().unwrap()),
-            json_ld::syntax::Value::parse_str(&body, |span| {Location::new(Source::Nowhere, span)}).unwrap(),
+            json_ld::syntax::Value::parse_str(body, |span| {Location::new(Source::Nowhere, span)}).unwrap(),
         )
     );
     let options: json_ld::Options<IriIndex, locspan::Location<Source>> = json_ld::Options {
@@ -40,7 +40,7 @@ pub(crate) async fn string_to_jsonld_json(url: &mut String, body: &mut String) -
         }
         Err(e) => {
             println!("Error: {:?}", e);
-            return json!(format!("{:?}", e))
+            json!(format!("{:?}", e))
         }
     }
 }

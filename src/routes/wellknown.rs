@@ -35,7 +35,7 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
         Some(r) => {
             //regex to match acct:username@domain and @username@domain and extract
             let re = Regex::new(r"(acct:|@)(?<username>[\w]+)@(?<domain>[\w\-\.]+\.?[\w-]+)").unwrap();
-            match re.captures(&r) {
+            match re.captures(r) {
                 Some(cap) => {
                     println!("username: {}", &cap["username"]);
                     println!("domain: {}", &cap["domain"]);
