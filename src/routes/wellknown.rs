@@ -12,12 +12,11 @@ use serde::Deserialize;
 use serde_json::json;
 
 use regex::Regex;
-use surrealdb::{Surreal, engine::remote::ws::Ws, opt::auth::Root};
 use url::Url;
 
-use std::{sync::Arc, f32::consts::E};
+use std::sync::Arc;
 
-use crate::{Config, db::User};
+use crate::Config;
 
 pub(crate) fn routes() -> Router {
     Router::new()
@@ -48,10 +47,6 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
                         )
                     }
 
-                    // let query = surrealdb::
-                        // .where_("username", &cap["username"])
-                        // .build();
-                    // let users: Result<Option<crate::db::User>, _> = config.db.select(("users", "userid:userid1")).await;
                     let mut users = config.db.query("select * from users where userid = $userid")
                         .bind(("userid", &cap["username"])).await.unwrap();
 

@@ -28,14 +28,7 @@ struct Config {
 impl Config {
     async fn new() -> Self {
         let db = Surreal::new::<Ws>("127.0.0.1:8000").await.unwrap();
-        // db.signin(
-        //     Root {
-        //         username: "root",
-        //         password: "root",
-        //     }
-        // ).await.unwrap();
         db.use_ns("activitypub").use_db("activitypub").await.unwrap();
-        // println!("{:#?}", db.version().await.unwrap());
         Config {
             db,
             domain: DOMAIN.to_string(),
@@ -86,7 +79,6 @@ async fn kokt() -> impl IntoResponse {
 async fn ste() -> impl IntoResponse {
     (
         StatusCode::OK,
-        // Json(a)
         Json("OK")
     )
 }
