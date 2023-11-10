@@ -4,30 +4,55 @@ use axum::{
     Router,
     response::Json,
     response::IntoResponse,
-    http::{StatusCode, HeaderMap}
+    http::{StatusCode, HeaderMap},
+    Extension,
 };
 use reqwest::header;
 use serde::Deserialize;
 use serde_json::json;
 
 use regex::Regex;
+use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal};
 use url::Url;
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use ld::string_to_jsonld_json;
 
 mod ld;
+mod db;
 
 const DOMAIN: &str = "http://localhost:3001";
 
+#[derive(Clone)]
+#[derive(Debug)]
+struct Db {
+    db: Surreal<Client>,
+}
+
+impl Db {
+    async fn new() -> Self {
+        let db = Surreal::new::<Ws>("127.0.0.1:8000").await.unwrap();
+        db.use_db("activitypub").await.unwrap();
+        Db {
+            db,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    let db = Arc::new(
+        Db::new().await
+    );
+
     let app = Router::new()
         .route("/", get(root))
         .route("/.well-known/host-meta/", get(host_meta))
         .route("/.well-known/webfinger/", get(webfinger))
         .route("/_kokt", get(kokt))
-        .route("/_ste", get(ste));
+        .route("/_ste", get(ste))
+        // layer は最後
+        .layer(Extension(db));
         let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
 
     axum::Server::bind(&addr)
@@ -50,8 +75,12 @@ struct WebfingerQuery {
     resource: Option<String>,
 }
 
-async fn webfinger(resource: Query<WebfingerQuery>) -> impl IntoResponse {
-    println!("{:#?}", resource);
+    
+pub(crate) async fn webfinger(db: Extension<Arc<Db>>, resource: Query<WebfingerQuery>) -> impl IntoResponse {
+    // let user: Vec<db::User> = self.db.select("user").await.unwrap();
+    // println!("{:#?}", self.db.select::<db::User>("user"));
+
+    println!("{:#?}", db);
     match &resource.resource {
         Some(r) => {
             //regex to match acct:username@domain and @username@domain and extract
@@ -109,10 +138,6 @@ async fn kokt() -> impl IntoResponse {
         .await;
 
     let mut body = response.unwrap().text().await.unwrap();
-    let body2 = body.clone();
-
-    let body_str = serde_json::to_string(&serde_json::from_str::<serde_json::Value>(&body2).unwrap()).unwrap();
-    println!("{:#?}", body_str);
 
     let a = string_to_jsonld_json(&mut "https://simkey.net/users/8rg6sbkjuv/".to_string(), &mut body).await;
     (
