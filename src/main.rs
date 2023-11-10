@@ -77,10 +77,24 @@ async fn kokt() -> impl IntoResponse {
 }
 
 async fn ste() -> impl IntoResponse {
+    //https://fedibird.com/users/stesan
+    let response = reqwest::Client::new()
+        .get("https://fedibird.com/users/stesan")
+        .header("Accept", "application/ld+json")
+        .send()
+        .await;
+
+    let mut body = response.unwrap().text().await.unwrap();
+
+    let a = string_to_jsonld_json(&mut "https://simkey.net/users/8rg6sbkjuv/".to_string(), &mut body).await;
     (
         StatusCode::OK,
-        Json("OK")
+        Json(a)
     )
+    // (
+    //     StatusCode::OK,
+    //     Json("OK")
+    // )
 }
 
 async fn root() -> impl IntoResponse {

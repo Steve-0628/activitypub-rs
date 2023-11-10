@@ -10,6 +10,7 @@ dependencies = [
  "contextual",
  "iref",
  "json-ld",
+ "json-ld-syntax",
  "locspan",
  "once_cell",
  "rdf-types",
