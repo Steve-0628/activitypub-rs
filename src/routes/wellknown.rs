@@ -21,7 +21,7 @@ use crate::Config;
 pub(crate) fn routes() -> Router {
     Router::new()
         .route("/.well-known/host-meta/", get(host_meta))
-        .route("/.well-known/webfinger/", get(webfinger))
+        .route("/.well-known/webfinger", get(webfinger))
 }
 
 #[derive(Deserialize, Debug)]
@@ -47,14 +47,14 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
                         )
                     }
 
-                    let mut users = config.db.query("select * from users where userid = $userid")
-                        .bind(("userid", &cap["username"])).await.unwrap();
+                    let mut users = config.db.query("select * from users where username = $username")
+                        .bind(("username", &cap["username"])).await.unwrap();
 
                     let user: Option<crate::db::User> = users.take(0).unwrap();
 
                     match user {
                         Some(user) => {
-                            println!("user: {:?}", user);
+                            println!("user match: {:?}", user);
                             
                             let resp = json!({
                                 "subject": r,
@@ -75,7 +75,7 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
                             );
                         },
                         None => {
-                            println!("no user match");
+                            println!("no webfinger user match");
                         },
                     }
                 },

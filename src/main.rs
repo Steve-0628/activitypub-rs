@@ -7,7 +7,7 @@ use axum::{
     Extension,
 };
 use serde_json::json;
-use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal, opt::auth::Root};
+use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal, /* opt::auth::Root */}; // TODO: SurrealDBの認証
 
 use std::{net::SocketAddr, sync::Arc};
 use ld::string_to_jsonld_json;
@@ -16,7 +16,7 @@ mod ld;
 mod db;
 mod routes;
 
-const DOMAIN: &str = "http://localhost:3001";
+const DOMAIN: &str = "http://activitypub.local";
 
 #[derive(Clone)]
 #[derive(Debug)]
@@ -50,7 +50,7 @@ async fn main() {
         .route("/_ste", get(ste))
         // layer は最後
         .layer(Extension(config));
-        let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
+        let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
