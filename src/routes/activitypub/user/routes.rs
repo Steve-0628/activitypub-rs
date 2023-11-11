@@ -1,7 +1,8 @@
-use axum::{Router, routing::get};
-use super::user;
+use axum::{Router, routing::{get, post}};
+use super::{user, inbox};
 
 pub(crate) fn routes() -> Router {
     Router::new()
-        .route("/users/:username", get(user::user))
+        .route("/users/:userid", get(user::user))
+        .route("/users/:userid/inbox", post(inbox::inbox))
 }

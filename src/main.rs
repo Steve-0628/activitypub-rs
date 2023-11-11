@@ -23,6 +23,7 @@ const DOMAIN: &str = "http://activitypub.local";
 struct Config {
     db: Surreal<Client>,
     domain: String,
+    host: String,
 }
 
 impl Config {
@@ -32,6 +33,7 @@ impl Config {
         Config {
             db,
             domain: DOMAIN.to_string(),
+            host: url::Url::parse(DOMAIN).unwrap().host_str().unwrap().to_string(),
         }
     }
 }

@@ -47,8 +47,8 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
                         )
                     }
 
-                    let mut users = config.db.query("select * from users where username = $username")
-                        .bind(("username", &cap["username"])).await.unwrap();
+                    let mut users = config.db.query("select * from users where username = $username and host = $host")
+                        .bind(("username", &cap["username"])).bind(("host", &config.host)).await.unwrap();
 
                     let user: Option<crate::db::User> = users.take(0).unwrap();
 
@@ -59,13 +59,13 @@ pub(crate) async fn webfinger(config: Extension<Arc<Config>>, resource: Query<We
                             let resp = json!({
                                 "subject": r,
                                 "aliases": [
-                                    format!("{}/users/{}", &config.domain, &cap["username"])
+                                    format!("{}/users/{}", &config.domain, user.userid)
                                 ],
                                 "links": [
                                     {
                                         "rel": "self",
                                         "type": "application/activity+json",
-                                        "href": format!("{}/users/{}", &config.domain, &cap["username"])
+                                        "href": format!("{}/users/{}", &config.domain, user.userid)
                                     }
                                 ]
                             });

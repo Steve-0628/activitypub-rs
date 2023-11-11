@@ -4,9 +4,9 @@ use reqwest::{header, StatusCode};
 use serde_json::json;
 use crate::Config;
 
-pub(crate) async fn user(config: Extension<Arc<Config>>, Path(username): Path<String>) -> impl IntoResponse {
-    let mut users = config.db.query("select * from users where username = $username")
-        .bind(("username", &username)).await.unwrap();
+pub(crate) async fn user(config: Extension<Arc<Config>>, Path(userid): Path<String>) -> impl IntoResponse {
+    let mut users = config.db.query("select * from users where userid = $userid and host = $host")
+        .bind(("userid", &userid)).bind(("host", &config.host)).await.unwrap();
 
     let user: Option<crate::db::User> = users.take(0).unwrap();
 
@@ -46,6 +46,9 @@ pub(crate) async fn user(config: Extension<Arc<Config>>, Path(username): Path<St
                 "preferredUsername": user.username
             }
         );
+        // let signiture = 
+        // TODO: 署名をやっていく
+        // 署名したらたぶんいける
         let mut headers = HeaderMap::new();
         headers.insert(header::CONTENT_TYPE, "application/activity+json".parse().unwrap());
 
@@ -57,7 +60,7 @@ pub(crate) async fn user(config: Extension<Arc<Config>>, Path(username): Path<St
         ));
         
     } else {
-        println!("no user match: {:?}", &username);
+        println!("no user match: {:?}", &userid);
         return Err((StatusCode::NOT_FOUND, "Not Found"));
     }
 }
