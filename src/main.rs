@@ -10,9 +10,9 @@ use serde_json::json;
 use surrealdb::{engine::remote::ws::{Ws, Client}, Surreal, /* opt::auth::Root */}; // TODO: SurrealDBの認証
 
 use std::{net::SocketAddr, sync::Arc};
-use ld::string_to_jsonld_json;
+use utils::ld::string_to_jsonld_json;
 
-mod ld;
+mod utils;
 mod db;
 mod routes;
 
@@ -43,6 +43,8 @@ async fn main() {
     let config = Arc::new(
         Config::new().await
     );
+
+    db::check_schema(&config.db).await;
 
     let app = Router::new()
         .route("/", get(root))

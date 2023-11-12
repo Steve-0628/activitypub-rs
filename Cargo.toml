@@ -24,3 +24,6 @@ url = "2.4.1"
 once_cell = "1.18.0"
 tower = "0.4.13"
 json-ld-syntax = "0.15.0"
+chrono = "0.4.31"
+rsa = { version = "0.9.3", features = ["sha2"] }
+struct-field-names-as-array = "0.3.0"

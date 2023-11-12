@@ -1,18 +1,28 @@
-use std::sync::Arc;
-use axum::{Extension, http::HeaderMap, response::IntoResponse, extract::Path, Json};
+use crate::{Config, db::User};
+use axum::{extract::Path, http::HeaderMap, response::IntoResponse, Extension, Json};
+use chrono::Utc;
 use reqwest::{header, StatusCode};
 use serde_json::{json, Value};
-use crate::Config;
+use std::{str::FromStr, sync::Arc};
+use url::Url;
 
-pub(crate) async fn inbox(config: Extension<Arc<Config>>, Path(userid): Path<String>, body: axum::extract::Json<Value>) -> impl IntoResponse {
+pub(crate) async fn inbox(
+    config: Extension<Arc<Config>>,
+    Path(userid): Path<String>,
+    body: axum::extract::Json<Value>,
+) -> impl IntoResponse {
     println!("inbox: {:?}", &userid);
     // println!("body: {:?}", &body.to_string());
-    let mut users = config.db.query("select * from users where userid = $userid and host = $host")
-        .bind(("userid", &userid)).bind(("host", &config.host)).await.unwrap();
+    let mut users = config
+        .db
+        .query("select * from users where userid = $userid and host = $host")
+        .bind(("userid", &userid))
+        .bind(("host", &config.host))
+        .await
+        .unwrap();
     let request_type = &body.get("type").expect("Wrong ActivityPub Request");
     println!("request_type: {:?}", request_type.to_string().as_str());
 
-    
     let user: Option<crate::db::User> = users.take(0).unwrap();
 
     if let Some(user) = user {
@@ -52,17 +62,18 @@ pub(crate) async fn inbox(config: Extension<Arc<Config>>, Path(userid): Path<Str
         //     }
         // );
 
-
         let remote_actor_uri = body.get("actor").unwrap();
-        let mut remote_actor_q = config.db.query("select * from users where uri = $uri")
-            .bind(("uri", remote_actor_uri)).await.unwrap();
+        let mut remote_actor_q = config
+            .db
+            .query("select * from users where uri = $uri")
+            .bind(("uri", remote_actor_uri))
+            .await
+            .unwrap();
 
         let remote_actor: Option<crate::db::User> = remote_actor_q.take(0).unwrap();
-        
+
         let remote_actor = match remote_actor {
-            Some(remote_actor) => {
-                remote_actor
-            },
+            Some(remote_actor) => remote_actor,
             None => {
                 println!("no remote_actor match");
                 let remote = reqwest::Client::new()
@@ -71,40 +82,55 @@ pub(crate) async fn inbox(config: Extension<Arc<Config>>, Path(userid): Path<Str
                     .send()
                     .await;
 
-
                 match remote {
                     Ok(resp) => {
                         let resp_json: Value = resp.json().await.unwrap();
-                        let mut create_res = config.db.query("create users set userid = $userid, username = $username, host = $host, uri = $uri, inbox = $inbox, outbox = $outbox")
-                            .bind(("userid", resp_json.get("id").unwrap()))
-                            .bind(("username", resp_json.get("preferredUsername").unwrap()))
-                            .bind(("host", "aaa"))
-                            .bind(("uri", resp_json.get("id").unwrap()))
-                            .bind(("inbox", resp_json.get("inbox").unwrap()))
-                            .bind(("outbox", resp_json.get("outbox").unwrap()))
+                        // let mut create_res = config.db.query("create users set userid = $userid, username = $username, host = $host, uri = $uri, inbox = $inbox, outbox = $outbox")
+                        //     .bind(("userid", resp_json.get("id").unwrap()))
+                        //     .bind(("username", resp_json.get("preferredUsername").unwrap()))
+                        //     .bind(("host", "aaa"))
+                        //     .bind(("uri", resp_json.get("id").unwrap()))
+                        //     .bind(("inbox", resp_json.get("inbox").unwrap()))
+                        //     .bind(("outbox", resp_json.get("outbox").unwrap()));
+                            
+
+                        let remote_user = User {
+                            userid: resp_json.get("id").unwrap().as_str().unwrap().to_string(),
+                            username: resp_json.get("preferredUsername").unwrap().as_str().unwrap().to_string(),
+                            host: url::Url::from_str(resp_json.get("id").unwrap().as_str().unwrap()).unwrap().host_str().unwrap().to_string(),
+                            uri: resp_json.get("id").unwrap().as_str().unwrap().to_string(),
+                            inbox: resp_json.get("inbox").unwrap().as_str().unwrap().to_string(),
+                            outbox: resp_json.get("outbox").unwrap().as_str().unwrap().to_string(),
+                            pubkey: resp_json.get("publicKey").unwrap().get("publicKeyPem").unwrap().as_str().unwrap().to_string(),
+                            privkey: "REMOTE".to_string(),
+                        };
+                        let _: Vec<User> = config.db.create("users")
+                            .content(&remote_user)
+                            
                             .await.unwrap();
-                        let remote_user: Option<crate::db::User> = create_res.take(0).unwrap();
-                        remote_user.unwrap()
-                    },
+                        // let remote_user: Option<crate::db::User> = create_res.first().unwrap();
+                        remote_user
+                    }
                     Err(e) => {
                         println!("Error: {:?}", e);
                         return Err((StatusCode::BAD_REQUEST, "Not Found"));
-                    },
+                    }
                 }
-
-            },
+            }
         };
 
         println!("remote_actor: {:?}", remote_actor);
 
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, "application/activity+json".parse().unwrap());
-
+        headers.insert(
+            header::CONTENT_TYPE,
+            "application/activity+json".parse().unwrap(),
+        );
 
         match request_type.as_str().unwrap() {
             "Follow" => {
                 println!("Follow: {:?}", request_type);
-                
+
                 let resp = json!(
                     {
                         "@context": [
@@ -141,8 +167,35 @@ pub(crate) async fn inbox(config: Extension<Arc<Config>>, Path(userid): Path<Str
                         }
                     }
                 );
-                
                 println!("resp: {:?}", resp);
+
+                let signing_headers = json!({
+                    "(request-target)": format!("post /users/{}/inbox", user.userid),
+                    "date": "",
+                    "host": config.host,
+                    "accept": "application/activity+json",
+                });
+                let signing_string = format!("(request-target): post {}\ndate: {}\nhost: {}\naccept: application/activity+json", Url::from_str(&remote_actor.inbox).unwrap().path(), Utc::now().to_rfc3339() ,config.host);
+                let signing_string = signing_string.as_bytes();
+
+                // https://docs.rs/rsa/latest/rsa/ ←？？？？？？？
+
+                // let a = sigh::SigningConfig::new(
+                //     sigh::alg::RsaSha256,
+                //     &sigh::PrivateKey::from_pem("private_key".as_bytes()).unwrap(),
+                //     "key_id",
+                // );
+
+                // let req = reqwest::Client::new()
+                //     .post(remote_actor.inbox)
+                //     .header("Content-Type", "application/ld+json")
+                //     .header("Date", Utc::now().to_rfc3339())
+                //     .header("Host", config.host)
+                //     .json(&resp)
+                //     .build()
+                //     .unwrap();
+
+                // a.sign(&mut req).unwrap();
 
                 // send to remote users' inbox
                 let remote_inbox = reqwest::Client::new()
@@ -152,28 +205,17 @@ pub(crate) async fn inbox(config: Extension<Arc<Config>>, Path(userid): Path<Str
                     .send()
                     .await;
 
-                return Ok((
-                    headers,
-                    Json(json!(
-                        {}
-                    )),
-                ));
-            },
+                return Ok((headers, Json(json!({}))));
+            }
             "Undo" => {
                 println!("Undo: {:?}", request_type);
-            },
+            }
             default => {
                 println!("default: {:?}", default);
             }
         }
 
-        return Ok((
-            headers,
-            Json(json!(
-                {}
-            )),
-        ));
-        
+        return Ok((headers, Json(json!({}))));
     } else {
         println!("no user match: {:?}", &userid);
         return Err((StatusCode::NOT_FOUND, "Not Found"));
