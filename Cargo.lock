@@ -17,6 +17,7 @@ dependencies = [
  "rdf-types",
  "regex",
  "reqwest",
+ "ring 0.17.5",
  "rsa",
  "serde",
  "serde_json",
