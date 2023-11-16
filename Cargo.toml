@@ -28,3 +28,4 @@ chrono = "0.4.31"
 rsa = { version = "0.9.3", features = ["sha2"] }
 struct-field-names-as-array = "0.3.0"
 ring = "0.17.5"
+rand = "0.8.5"

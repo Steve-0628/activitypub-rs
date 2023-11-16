@@ -43,7 +43,13 @@ pub(crate) async fn user(config: Extension<Arc<Config>>, Path(userid): Path<Stri
                 "id": format!("{}/users/{}", config.domain, user.userid),
                 "inbox": format!("{}/users/{}/inbox", config.domain, user.userid),
                 "outbox": format!("{}/users/{}/outbox", config.domain, user.userid),
-                "preferredUsername": user.username
+                "preferredUsername": user.username,
+                "publicKey": {
+                    "id": format!("{}/users/{}#main-key", config.domain, user.userid),
+                    "type": "Key",
+                    "owner": format!("{}/users/{}", config.domain, user.userid),
+                    "publicKeyPem": user.pubkey
+                }
             }
         );
         // let signiture = 

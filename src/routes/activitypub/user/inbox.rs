@@ -1,4 +1,4 @@
-use crate::{Config, db::User};
+use crate::{Config, db::User, utils::signature};
 use axum::{extract::Path, http::HeaderMap, response::IntoResponse, Extension, Json};
 use chrono::Utc;
 use reqwest::{header, StatusCode};
@@ -175,9 +175,9 @@ pub(crate) async fn inbox(
                     "host": config.host,
                     "accept": "application/activity+json",
                 });
-                let signing_string = format!("(request-target): post {}\ndate: {}\nhost: {}\naccept: application/activity+json", Url::from_str(&remote_actor.inbox).unwrap().path(), Utc::now().to_rfc3339() ,config.host);
-                let signing_string = signing_string.as_bytes();
-
+                let signing_string = format!("(request-target): post {}\ndate: {}\nhost: {}\ncontent-type: application/activity+json", Url::from_str(&remote_actor.inbox).unwrap().path(), Utc::now().to_rfc3339(), config.host);
+                let signature = signature::sign_string_with_privkey(&signing_string, &user.privkey);
+                let signature_header = format!("keyId=\"{}#main-key\",algorithm=\"rsa-sha256\",headers=\"(request-target) date host content-type\",signature=\"{}\"", format!("{}/users/{}", config.domain, user.userid), signature);
                 // https://docs.rs/rsa/latest/rsa/ ←？？？？？？？
 
                 // let a = sigh::SigningConfig::new(
@@ -199,11 +199,20 @@ pub(crate) async fn inbox(
 
                 // send to remote users' inbox
                 let remote_inbox = reqwest::Client::new()
-                    .post(remote_actor.inbox)
-                    .header("Content-Type", "application/ld+json")
+                    .post(&remote_actor.inbox)
+                    .header("Content-Type", "application/activity+json")
+                    .header("date", Utc::now().to_rfc3339())
+                    // .header("host", &config.host)
+                    .header("Signature", &signature_header)
+                    .header("Authorization", format!("Signature {}", &signature_header))
                     .json(&resp)
                     .send()
                     .await;
+
+                println!("{:?}", &resp.to_string());
+
+                println!("remote_inbox: {:?}", &remote_actor.inbox);
+                println!("remote_inbox: {:?}", remote_inbox.unwrap());
 
                 return Ok((headers, Json(json!({}))));
             }

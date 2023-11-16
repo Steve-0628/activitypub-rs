@@ -14,6 +14,7 @@ dependencies = [
  "json-ld-syntax",
  "locspan",
  "once_cell",
+ "rand",
  "rdf-types",
  "regex",
  "reqwest",
