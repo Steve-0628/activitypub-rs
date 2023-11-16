@@ -1,50 +1,14 @@
-use reqwest::{Request, header};
-use rand::Rng;
 use rsa::RsaPrivateKey;
-use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
-use rsa::sha2::{Digest, Sha256};
+use rsa::pkcs1v15::SigningKey;
+use rsa::signature::RandomizedSigner;
+use rsa::sha2::Sha256;
 use rsa::pkcs8::DecodePrivateKey;
-
-pub(crate) async fn sign_to_reqest(req:&mut Request) -> &mut Request {
-    let mut headers = req.headers_mut();
-
-    req
-}
-
-// use ring::{rand, rsa, signature};
-
-
-// たぶん署名はこれ 使い方が不明 いつかなんとかする
-// fn sign_and_verify_rsa(private_key_path: &std::path::Path,
-//                        public_key_path: &std::path::Path)
-//                        -> Result<(), MyError> {
-//     // Create an RSA keypair from the DER-encoded bytes. This example uses
-//     // a 2048-bit key, but larger keys are also supported.
-//     let private_key_der = read_file(private_key_path)?;
-//     let key_pair = rsa::KeyPair::from_der(&private_key_der)
-//         .map_err(|_| MyError::BadPrivateKey)?;
-
-//     // Sign the message "hello, world", using PKCS#1 v1.5 padding and the
-//     // SHA256 digest algorithm.
-//     const MESSAGE: &'static [u8] = b"hello, world";
-//     let rng = rand::SystemRandom::new();
-//     let mut signature = vec![0; key_pair.public().modulus_len()];
-//     key_pair.sign(&signature::RSA_PKCS1_SHA256, &rng, MESSAGE, &mut signature)
-//         .map_err(|_| MyError::OOM)?;
-
-//     // Verify the signature.
-//     let public_key =
-//         signature::UnparsedPublicKey::new(&signature::RSA_PKCS1_2048_8192_SHA256,
-//                                         read_file(public_key_path)?);
-//     public_key.verify(MESSAGE, &signature)
-//         .map_err(|_| MyError::BadSignature)
-// }
 
 // write test
 #[test]
 fn some_test() {
     let headers = "test";
+    // this key is safe to leak
     let privkey = "-----BEGIN PRIVATE KEY-----
 MIIJQQIBADANBgkqhkiG9w0BAQEFAASCCSswggknAgEAAoICAQDnf7IH3YejwMC8
 BEiQLkcGO0SjZT0Ljwx8Z0+SNp0D09J/Wfhh+Vu24t5JxLEsww37D4D11ls/Rxpp
@@ -111,53 +75,6 @@ DeBarcSEEEOYVVW7N7pal3x6Ta2G
 }
 
 pub(crate) fn sign_string_with_privkey(headers: &str, privkey: &str) -> String {
-    // let rng = rand::SystemRandom::new();
-    // let key_pair = rsa::KeyPair::from_pkcs8(privkey.as_bytes()).map_err(|_| MyError::BadPrivateKey)?;
-//     let PRIV_KEY = "-----BEGIN PRIVATE KEY-----
-// MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCE5OWoW+4Y/hrH
-// yuyH0pk62Ot37E/u0VCXMgAEYKp6R8aiszfoipvH4RdKZcUeH15f3ZdzDFFD4gqS
-// MThFM6OzTZWV0jHoa+MW3Idp5/tc+8kra0pTJuKDJjTHknjP9jXYXtrcgUMwwEfU
-// eFf0FtoeHIAq/NBlXb/vnchA8g+iZ2iczxILf4tHflSXgjuSf+NRqr6YxagkcmaA
-// pyYLnkzePbwBUFk0J5VIpgXhGIto0osZmrwrZ5E1bt1GQunu1tYhsVw3MSiZx/DC
-// +pYyIDcsxRh32X26SWNYjXFw/6aMIu+w5L4B4WxX1QYvEJJQWKaN4a0P5hdQJz93
-// /GIN4B99AgMBAAECggEAAcoSNIuI/8GmIH62jhfzaQ6EJyEhrLnD78aO0lWZ3gZ1
-// jHnEx4cG6htOr2QCPNxXw+CC2kagw9JOlEwrht+sioIW1kWrrIaNWstdMGYc+pIc
-// /I5tLwRE7wFL8Hb5VPV/9pnvsPc1mCRdTeVRQS+wlVC1bL7AMJPhUnY0UiQ1j9kh
-// y3pouIlksPIhA5Y7mkTSKs86gL3Jte0Qa9ZIeq23C2jEU0gpf6Imx9TwOw+vMuO9
-// 6GJ2ha58yuVpMPplHRXuRl2o6QlxafJDSjP/EDNH/sYhYrfJu5WLZNS3bRpko2q5
-// NHYCzdkSyhGcLIbcxeAqtNjN4vVPX+gpaSNpK0QVUQKBgQC5D7dtmzV46HFByXeI
-// /F2x6pO/CpbNAZ1R+eDB90K0h+AmcqdTrnr37BewO178HSxAlTQU6CyVsFmH0csM
-// gSqnemGlxMFGRX+dEQReqdEg8fh5gMwalWIB0ZyvZQJsffxkwvMS73fb64fMJt2i
-// TTLtitj0I/GnQLTPZm6Dj5CqrQKBgQC31fK3VfoUZoBIrdDpB8h4WH5bXEvI0jK1
-// vJqjJEgkIq79SE/HbMccxip4K7uo/1GjFe4KwN7Uuhc35UwB19dBi7J21MeDJ/cG
-// 5dVCntynPuWe/CCSvElGrfPmGOc6pGummxpHlIPT7fyma/yyPvnwtZ6LyAt0FUl8
-// 9stz+IsyEQKBgQCz/5VqBoz8DRob4tlhZBW992u9ZY9H10otcd4qy1UWQxLCUsJt
-// okf43Kotv5GjprxkFLuTmj/DWMO8V1In13qla2OO2NEkiHSXUPXvHT1Lzg7gH2Zm
-// dOXe3wKHlrfEzsWvO+8xe7oZLf3nk+X+9xeR9HsQ++UPyOAU2oyjagBMAQKBgGdx
-// /shnmveLzjgXhuz6MjZ2JXQndYWlsl9Np/6RVf7vfWSNIkdn0ItCf3drtIeeVEPe
-// /ToT2c/+fz42yxRmbnw1rdDsXvBQttKs1dpNJoD+BZv26CVpyhn5nLsn3EXFa8Yu
-// lRUeXygMTRUgwutSQLbQnEyv3rINoHKvNUEm5LzhAoGAdlHajGFACUltKKag2Cbt
-// 7xFAr9m2xQXcWLxeooN6wpFlLtqmaBqbRpGu2yIOPTCxiJa2wEb3yOs4mp4smKr7
-// YkFVUMDcCIh91ZQr+DeztzO/6YqxrZNQXZa/seDen3g19PQVz/uaQdNGf7P05kmL
-// Vqv51od8+CZ3PJBxN/av7SU=
-// -----END PRIVATE KEY-----";
-//     let mut signature = vec![0; key_pair.public().modulus_len()];
-//     key_pair.sign(&signature::RSA_PKCS1_SHA256, &rng, MESSAGE, &mut signature)
-//         .map_err(|_| MyError::OOM)?;
-//     headers.insert("X-Signature", signature);
-//     Ok(())
-
-    // let mut rng = rand::thread_rng();
-
-    // let bits = 4096;
-
-    // let private_key: RsaPrivateKey = DecodePrivateKey::from_pkcs8_pem(privkey).unwrap();
-    // let signing_key: SigningKey<Sha256> = SigningKey::<Sha256>::new(private_key); 
-
-    // let data = headers.as_bytes();
-    
-    // let mut signature = signing_key.sign_with_rng(&mut rng, data);
-    // Ok(signature.to_string())
 
     let mut rng = rand::thread_rng();
 
@@ -172,12 +89,3 @@ pub(crate) fn sign_string_with_privkey(headers: &str, privkey: &str) -> String {
 
     // Err(MyError::BadPrivateKey)
 }
-
-// fn read_file(path: &std::path::Path) -> Result<Vec<u8>, MyError> {
-//     use std::io::Read;
-
-//     let mut file = std::fs::File::open(path).map_err(|e| MyError::IO(e))?;
-//     let mut contents: Vec<u8> = Vec::new();
-//     file.read_to_end(&mut contents).map_err(|e| MyError::IO(e))?;
-//     Ok(contents)
-// }
