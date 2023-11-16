@@ -16,7 +16,7 @@ mod utils;
 mod db;
 mod routes;
 
-const DOMAIN: &str = "http://activitypub.local";
+const DOMAIN: &str = "https://activitypub.local";
 
 #[derive(Clone)]
 #[derive(Debug)]

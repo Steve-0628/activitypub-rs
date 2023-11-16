@@ -131,7 +131,7 @@ pub(crate) async fn inbox(
             "Follow" => {
                 println!("Follow: {:?}", request_type);
 
-                let resp = json!(
+                let mut resp = json!(
                     {
                         "@context": [
                             "https://www.w3.org/ns/activitystreams",
@@ -160,42 +160,19 @@ pub(crate) async fn inbox(
                         ],
                         "type": "Accept",
                         "actor": format!("{}/users/{}", config.domain, user.userid),
-                        "object": {
-                            "type": "Follow",
-                            "actor": body.get("actor").unwrap(),
-                            "object": body.get("object").unwrap()
-                        }
+                        "object": json!(body.0)
                     }
                 );
-                println!("resp: {:?}", resp);
+                let obj = resp.get_mut("object").unwrap().as_object_mut().unwrap();
+                obj.remove("@context");                
+                
+                // resp["object"] = body.0.clone();
+                // println!("resp: {:?}", resp);
+                
 
-                let signing_headers = json!({
-                    "(request-target)": format!("post /users/{}/inbox", user.userid),
-                    "date": "",
-                    "host": config.host,
-                    "accept": "application/activity+json",
-                });
                 let signing_string = format!("(request-target): post {}\ndate: {}\nhost: {}\ncontent-type: application/activity+json", Url::from_str(&remote_actor.inbox).unwrap().path(), Utc::now().to_rfc3339(), config.host);
                 let signature = signature::sign_string_with_privkey(&signing_string, &user.privkey);
                 let signature_header = format!("keyId=\"{}#main-key\",algorithm=\"rsa-sha256\",headers=\"(request-target) date host content-type\",signature=\"{}\"", format!("{}/users/{}", config.domain, user.userid), signature);
-                // https://docs.rs/rsa/latest/rsa/ ←？？？？？？？
-
-                // let a = sigh::SigningConfig::new(
-                //     sigh::alg::RsaSha256,
-                //     &sigh::PrivateKey::from_pem("private_key".as_bytes()).unwrap(),
-                //     "key_id",
-                // );
-
-                // let req = reqwest::Client::new()
-                //     .post(remote_actor.inbox)
-                //     .header("Content-Type", "application/ld+json")
-                //     .header("Date", Utc::now().to_rfc3339())
-                //     .header("Host", config.host)
-                //     .json(&resp)
-                //     .build()
-                //     .unwrap();
-
-                // a.sign(&mut req).unwrap();
 
                 // send to remote users' inbox
                 let remote_inbox = reqwest::Client::new()
